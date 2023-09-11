@@ -46,18 +46,26 @@ newImage = False
 capture_start = None
 capture_end = None
 
+# Initialize capture marker
+capture_marker = None
+
 # Reload templates
 reload_templates()
 
 def capture_region(event, x, y, flags, param):
-    global capturing, capture_start, capture_end, newImage
+    global capturing, capture_start, capture_end, newImage, capture_marker
     if capturing:
         if event == cv2.EVENT_LBUTTONDOWN:
             capture_start = (x, y)
+            capture_marker = (x, y)
+        elif event == cv2.EVENT_MOUSEMOVE and capture_start:
+            # Update the capture marker coordinates
+            capture_marker = (x, y)
         elif event == cv2.EVENT_LBUTTONUP:
             newImage = True
             capturing = False
             capture_end = (x, y)
+            capture_marker = None
 
 cv2.namedWindow('frame')
 cv2.setMouseCallback('frame', capture_region)
@@ -128,6 +136,12 @@ while True:
             bottom_right = (top_left[0] + template.shape[1], top_left[1] + template.shape[0])
             cv2.rectangle(frame, top_left, bottom_right, (0, 255, 0), 2)
             cv2.putText(frame, template_name, (top_left[0], top_left[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 1)
+
+    # If in capture mode, draw the capture box
+    if capturing and capture_start and capture_marker:
+        x1, y1 = capture_start
+        x2, y2 = capture_marker
+        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
 
     # Display the resulting frame
     cv2.imshow('frame', frame)
