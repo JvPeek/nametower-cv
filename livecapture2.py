@@ -4,6 +4,12 @@ import numpy as np
 import argparse
 import time
 
+# Function to reload template files
+def reload_templates():
+    global template_files
+    template_files = [f for f in os.listdir(templates_folder) if f.lower().endswith(".jpg")]
+    print("Reloaded template files")
+
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Template Matching with Configurable Threshold")
 parser.add_argument("--threshold", type=float, default=0.7, help="Matching threshold (0 to 1)")
@@ -35,19 +41,20 @@ capturing = False
 
 # Flag to indicate we have a new picture captured
 newImage = False
+
 # Initialize variables for capturing a region
 capture_start = None
 capture_end = None
 
+# Reload templates
+reload_templates()
+
 def capture_region(event, x, y, flags, param):
-    global capturing, capture_start, capture_end
+    global capturing, capture_start, capture_end, newImage
     if capturing:
-        print ("capturing region")
         if event == cv2.EVENT_LBUTTONDOWN:
-            print ("capture start")
             capture_start = (x, y)
         elif event == cv2.EVENT_LBUTTONUP:
-            print ("capture end")
             newImage = True
             capturing = False
             capture_end = (x, y)
@@ -149,6 +156,10 @@ while True:
         capturing = not capturing
         capture_start = None
         capture_end = None
+
+    # Check for the 'r' key to reload templates
+    elif key == ord('r'):
+        reload_templates()
 
 # Release the video capture object and close all windows
 vid.release()
