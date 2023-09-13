@@ -5,6 +5,7 @@ import argparse
 import time
 import json
 import paho.mqtt.client as mqtt
+from multiprocessing import Pool
 
 # Function to reload template files
 def reload_templates():
@@ -102,6 +103,36 @@ client.loop_start()
 
 cv2.namedWindow('frame')
 cv2.setMouseCallback('frame', capture_region)
+def detect (template_file):
+    template_path = os.path.join(templates_folder, template_file)
+
+    # Read the template image
+    template = cv2.imread(template_path)
+
+    # Match the template in the frame
+    result = cv2.matchTemplate(frame, template, cv2.TM_CCOEFF_NORMED)
+
+    # Get the maximum match value and its location
+    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+
+    # Use the threshold specified via command-line argument
+    if max_val >= args.threshold:
+        # Get the filename (without extension) of the template
+        template_name = os.path.splitext(template_file)[0]
+
+        # Check if this match is better than the best match for this template so far
+        if template_name not in best_matches or max_val > best_matches[template_name][0]:
+            best_matches[template_name] = (max_val, max_loc)
+            
+            # Store the coordinates of the detected region and its name
+            detected_region = {
+                "start": [max_loc[0], max_loc[1]],
+                "end": [max_loc[0] + template.shape[1], max_loc[1] + template.shape[0]],
+                "name": template_name
+            }
+            return detected_region
+    return None
+
 
 while True:
     ret, frame = vid.read()
@@ -116,37 +147,24 @@ while True:
 
     # If in detection mode, perform template matching
     if detecting:
+        reload_templates()
         detecting = False
         best_matches = {}
         detected_regions = []
-        # Iterate through the template files
-        for template_file in template_files:
-            template_path = os.path.join(templates_folder, template_file)
 
-            # Read the template image
-            template = cv2.imread(template_path)
 
-            # Match the template in the frame
-            result = cv2.matchTemplate(frame, template, cv2.TM_CCOEFF_NORMED)
+        # Iterate through the template files - now multithreaded
+        with Pool(8) as pool:
+            results = pool.imap_unordered(detect, template_files)
+            # filter empty entries from list
+            detected_regions = [x for x in results if x]
 
-            # Get the maximum match value and its location
-            min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
 
-            # Use the threshold specified via command-line argument
-            if max_val >= args.threshold:
-                # Get the filename (without extension) of the template
-                template_name = os.path.splitext(template_file)[0]
 
-                # Check if this match is better than the best match for this template so far
-                if template_name not in best_matches or max_val > best_matches[template_name][0]:
-                    best_matches[template_name] = (max_val, max_loc)
-                    
-                    # Store the coordinates of the detected region and its name
-                    detected_regions.append({
-                        "start": [max_loc[0], max_loc[1]],
-                        "end": [max_loc[0] + template.shape[1], max_loc[1] + template.shape[0]],
-                        "name": template_name
-                    })
+
+
+
+
 
         # Sort detected regions by their y-coordinate
         detected_regions.sort(key=lambda x: x["start"][1])
@@ -183,12 +201,9 @@ while True:
 
     if displayMarkers:
         # Draw rectangles and labels for the best matches and previously detected regions
-        for template_name, (max_val, max_loc) in best_matches.items():
-            template = cv2.imread(os.path.join(templates_folder, f"{template_name}.jpg"))
-            top_left = max_loc
-            bottom_right = (top_left[0] + template.shape[1], top_left[1] + template.shape[0])
-            cv2.rectangle(frame, top_left, bottom_right, (0, 255, 0), 2)
-            cv2.putText(frame, template_name, (top_left[0], top_left[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 1)
+        for region in detected_regions:
+            cv2.rectangle(frame, region["start"], region["end"], (0, 255, 0), 2)
+            cv2.putText(frame, region["name"], (region["start"][0], region["start"][1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 1)
     # If in capture mode, draw the capture box
     if capturing and capture_start and capture_marker:
         x1, y1 = capture_start
