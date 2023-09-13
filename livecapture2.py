@@ -14,10 +14,21 @@ def reload_templates():
 
 # Function to send JSON data to MQTT broker
 def send_to_mqtt(data):
-    client = mqtt.Client()
-    client.connect("192.168.2.11", 1883)
+
     client.publish("nametower/namelist", json.dumps(data))
-    client.disconnect()
+
+# MQTT on_connect callback
+def on_connect(client, userdata, flags, rc):
+    print(f"Connected with result code {rc}")
+    # Subscribe to the MQTT topic where detection commands will be received
+    client.subscribe("nametower/command/#")
+
+# MQTT on_message callback
+def on_message(client, userdata, msg):
+    global detecting
+    if msg.payload.decode() == "start_detection":
+        print("Received start_detection command")
+        detecting = True
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Template Matching with Configurable Threshold")
@@ -61,6 +72,10 @@ capture_marker = None
 # Reload templates
 reload_templates()
 
+client = mqtt.Client()
+client.connect("192.168.2.11", 1883)
+
+# Function call when a region is being captured
 def capture_region(event, x, y, flags, param):
     global capturing, capture_start, capture_end, newImage, capture_marker
     if capturing:
@@ -76,6 +91,14 @@ def capture_region(event, x, y, flags, param):
             capture_end = (x, y)
             capture_marker = None
 
+# Set up MQTT client
+client = mqtt.Client()
+client.on_connect = on_connect
+client.on_message = on_message
+client.connect("192.168.2.11", 1883)
+
+# Start the MQTT loop in a non-blocking way
+client.loop_start()
 
 cv2.namedWindow('frame')
 cv2.setMouseCallback('frame', capture_region)
@@ -185,7 +208,7 @@ while True:
     # Check for the 'm' key to toggle markers
     if key == ord('m'):
         displayMarkers = not displayMarkers
-
+        
     # Check for the spacebar key to toggle detection mode
     elif key == 32:  # Spacebar key
         detecting = not detecting
@@ -207,3 +230,4 @@ while True:
 # Release the video capture object and close all windows
 vid.release()
 cv2.destroyAllWindows()
+client.disconnect()
