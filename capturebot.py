@@ -63,6 +63,9 @@ capturing = False
 # Flag to indicate we have a new picture captured
 newImage = False
 
+# Flag to indicate if we want to display the camera image
+displayCameraImage = True
+
 # Initialize variables for capturing a region
 capture_start = None
 capture_end = None
@@ -135,7 +138,15 @@ def detect (template_file):
 
 
 while True:
-    ret, frame = vid.read()
+    frame = None
+    # or, if needed, overwrite empty frame with camera image. Otherwise save performance.
+    if (displayCameraImage or detecting or capturing):
+        ret, frame = vid.read()
+    else:
+        # Generate empty frame
+        frame = np.zeros((1080, 1920, 3), dtype = np.uint8)
+        time.sleep(0.5)
+    
 
     # Draw a capturing mode indicator
     if capturing:
@@ -219,7 +230,12 @@ while True:
     # Check for the 'q' key to quit
     if key == ord('q'):
         break
+    
+    # check for the 'p' key to disable camera image rendering
+    if key == ord('p'):
+        displayCameraImage = not displayCameraImage
 
+    
     # Check for the 'm' key to toggle markers
     if key == ord('m'):
         displayMarkers = not displayMarkers
