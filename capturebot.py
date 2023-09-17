@@ -34,6 +34,7 @@ def on_message(client, userdata, msg):
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Template Matching with Configurable Threshold")
 parser.add_argument("--threshold", type=float, default=0.7, help="Matching threshold (0 to 1)")
+parser.add_argument("--cam", type=int, default=0, help="Camera number")
 args = parser.parse_args()
 
 # Path to the templates folder
@@ -43,7 +44,7 @@ templates_folder = "templates"
 template_files = [f for f in os.listdir(templates_folder) if f.lower().endswith(".jpg")]
 
 # Create a video capture object
-vid = cv2.VideoCapture(0)
+vid = cv2.VideoCapture(args.cam)
 
 # Flag to indicate if we are in detection mode (spacebar is pressed)
 detecting = False
